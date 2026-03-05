@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   fileButtonFormats: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#ffffff0d',
+    borderColor: colors.border,
   },
   fileInfoRow: {
     flexDirection: 'row',
@@ -98,13 +98,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   fileInfoArrow: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 16,
     fontWeight: '700',
     width: 16,
   },
   fileInfoValue: {
-    color: colors.sub,
+    color: colors.purpleLight,
     fontSize: 12,
     flex: 1,
   },

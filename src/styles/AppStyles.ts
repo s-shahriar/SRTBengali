@@ -14,7 +14,7 @@ export const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#ffffff0d',
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
   headerRow: {
@@ -24,27 +24,27 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: colors.purple,
+    color: colors.purpleLight,
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: 0.3,
     textAlign: 'center',
   },
   headerBadge: {
-    backgroundColor: '#8b7fff22',
+    backgroundColor: `${colors.purple}22`,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: '#8b7fff44',
+    borderColor: `${colors.purple}44`,
   },
   headerBadgeText: {
-    color: colors.purple,
+    color: colors.purpleLight,
     fontSize: 13,
     fontWeight: '600',
   },
   headerSub: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 6,
     textAlign: 'center',
@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: Platform.OS === 'android' ? 'monospace' : 'Courier New',
     borderWidth: 1,
-    borderColor: '#ffffff12',
+    borderColor: colors.border,
   },
   saveBtn: {
     backgroundColor: colors.purple,
@@ -91,7 +91,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnDone: {
-    backgroundColor: '#2a6b3f',
+    backgroundColor: colors.success,
   },
   saveBtnText: {
     color: '#fff',

@@ -32,6 +32,8 @@ import { StepHeader } from './src/components/StepHeader';
 import { ModelPicker } from './src/components/ModelPicker';
 import { FileSelector } from './src/components/FileSelector';
 import { ProcessingLog } from './src/components/ProcessingLog';
+import { ViewToggle, ViewMode } from './src/components/ViewToggle';
+import { FileBrowser } from './src/components/FileBrowser';
 
 // Utils
 import { detectFormat, makeOutputName } from './src/utils/subtitleParser';
@@ -39,6 +41,9 @@ import { detectFormat, makeOutputName } from './src/utils/subtitleParser';
 const MODEL_ID_STORAGE_KEY = 'model_id';
 
 export default function App() {
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>('process');
+
   // API Key management
   const { apiKey, keySaved, saveApiKey, updateApiKey } = useApiKey();
 
@@ -117,11 +122,16 @@ export default function App() {
         </Text>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* View Toggle */}
+      <ViewToggle activeView={viewMode} onViewChange={setViewMode} />
+
+      {/* Process View */}
+      {viewMode === 'process' && (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Step 1: API Key */}
         <StepHeader number="1" title="GEMINI API KEY" />
         <View style={styles.row}>
@@ -194,6 +204,10 @@ export default function App() {
         {/* Log */}
         <ProcessingLog log={log} />
       </ScrollView>
+      )}
+
+      {/* Files View */}
+      {viewMode === 'files' && <FileBrowser />}
     </KeyboardAvoidingView>
   );
 }

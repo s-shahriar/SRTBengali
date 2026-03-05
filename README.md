@@ -69,13 +69,52 @@ eas build --platform android --profile preview
 
 ---
 
+## Build Locally (faster iteration)
+
+Instead of cloud builds, you can build on your local machine:
+
+### Prerequisites for local builds
+
+**Option 1: Using Docker (recommended)**
+```bash
+# Install Docker Desktop from docker.com
+# EAS will automatically detect and use it
+```
+
+**Option 2: Android Studio**
+- Install [Android Studio](https://developer.android.com/studio)
+- Install Android SDK, NDK, and build tools via SDK Manager
+- Set `ANDROID_HOME` environment variable
+
+### Local build commands
+
+```bash
+# Build APK locally (no EAS cloud usage)
+eas build --platform android --profile preview --local
+
+# Output: .apk file in current directory (~5-10 min first time)
+```
+
+**Benefits of local builds:**
+- Faster iteration (no upload/queue time)
+- Free (no EAS build credits used)
+- Works offline after initial setup
+
+**Drawbacks:**
+- Requires local setup (Docker or Android Studio)
+- Uses your machine's resources
+- Larger initial download (~2-3 GB for Android build environment)
+
+---
+
 ## EAS Build reference
 
 | Command | What it does |
 |---|---|
 | `eas login` | Log in to your Expo account |
 | `eas whoami` | Check logged-in account |
-| `eas build --platform android --profile preview` | Build APK (free, no signing needed) |
+| `eas build --platform android --profile preview` | Build APK on cloud (free, no signing) |
+| `eas build --platform android --profile preview --local` | Build APK locally |
 | `eas build --platform android --profile production` | Build signed AAB for Play Store |
 | `eas build:list` | See all past builds |
 | `eas build:cancel` | Cancel a running build |

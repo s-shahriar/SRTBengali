@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ffffff0d',
+    borderColor: colors.border,
     gap: 10,
   },
   buttonText: {
@@ -102,12 +102,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   buttonInfo: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 11,
     marginTop: 3,
   },
   chevron: {
-    color: colors.purple,
+    color: colors.purpleLight,
     fontSize: 20,
   },
 
@@ -136,11 +136,12 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ffffff0d',
+    borderColor: colors.border,
   },
   modelOptionActive: {
     borderColor: colors.purple,
-    borderWidth: 1.5,
+    borderWidth: 2,
+    backgroundColor: `${colors.purple}11`,
   },
   modelOptionHeader: {
     flexDirection: 'row',
@@ -154,20 +155,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modelOptionInfo: {
-    color: colors.muted,
+    color: colors.textMuted,
     fontSize: 11,
     lineHeight: 16,
   },
   bestBadge: {
-    backgroundColor: '#8b7fff33',
+    backgroundColor: `${colors.cyan}22`,
     borderRadius: 5,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: '#8b7fff55',
+    borderColor: `${colors.cyan}55`,
   },
   bestBadgeText: {
-    color: colors.purple,
+    color: colors.cyan,
     fontSize: 10,
     fontWeight: '700',
   },

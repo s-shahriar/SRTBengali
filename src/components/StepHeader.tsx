@@ -33,6 +33,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.purple,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.purple,
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
   number: {
     color: '#fff',
@@ -40,7 +45,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   title: {
-    color: colors.sub,
+    color: colors.purpleLight,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.5,
