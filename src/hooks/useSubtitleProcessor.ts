@@ -35,7 +35,7 @@ function printReport(
   totalLines: number,
   onLog: (msg: string) => void,
 ) {
-  const log = (msg: string) => { onLog(msg); console.log(msg); };
+  const log = onLog;
 
   log('');
   log('═══════════════════════════════════════════');
