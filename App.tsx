@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GeminiModel, SelectedFile } from './src/types';
 
 // Constants
-import { MODELS } from './src/constants/config';
+import { MODELS, BATCH_SIZE, BATCH_SIZE_STORAGE_KEY } from './src/constants/config';
 
 // Styles
 import { colors } from './src/styles/theme';
@@ -34,6 +34,7 @@ import { FileSelector } from './src/components/FileSelector';
 import { ProcessingLog } from './src/components/ProcessingLog';
 import { ViewToggle, ViewMode } from './src/components/ViewToggle';
 import { FileBrowser } from './src/components/FileBrowser';
+import { BatchSizePicker } from './src/components/BatchSizePicker';
 
 // Utils
 import { detectFormat, makeOutputName } from './src/utils/subtitleParser';
@@ -51,18 +52,28 @@ export default function App() {
   const [model, setModel] = useState<GeminiModel>(MODELS[0]);
   const [modelModalVisible, setModelModalVisible] = useState(false);
 
+  // Batch size
+  const [batchSize, setBatchSize] = useState<number>(BATCH_SIZE);
+  const [batchSizeModalVisible, setBatchSizeModalVisible] = useState(false);
+
   // File selection
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
 
   // Logging
   const [log, setLog] = useState('');
 
-  // Restore saved model preference
+  // Restore saved preferences
   useEffect(() => {
     AsyncStorage.getItem(MODEL_ID_STORAGE_KEY).then(id => {
       if (id) {
         const savedModel = MODELS.find(m => m.id === id);
         if (savedModel) setModel(savedModel);
+      }
+    });
+    AsyncStorage.getItem(BATCH_SIZE_STORAGE_KEY).then(val => {
+      if (val) {
+        const size = parseInt(val, 10);
+        if (!isNaN(size) && size > 0) setBatchSize(size);
       }
     });
   }, []);
@@ -77,6 +88,7 @@ export default function App() {
     model,
     selectedFile,
     onLog: appendLog,
+    batchSize,
   });
 
   // Handlers
@@ -84,6 +96,12 @@ export default function App() {
     setModel(m);
     AsyncStorage.setItem(MODEL_ID_STORAGE_KEY, m.id);
     setModelModalVisible(false);
+  };
+
+  const handleSelectBatchSize = (size: number) => {
+    setBatchSize(size);
+    AsyncStorage.setItem(BATCH_SIZE_STORAGE_KEY, String(size));
+    setBatchSizeModalVisible(false);
   };
 
   const handlePickFile = async () => {
@@ -175,6 +193,17 @@ export default function App() {
           selectedFile={selectedFile}
           disabled={processing}
           onPickFile={handlePickFile}
+        />
+
+        {/* Step 4: Batch Size */}
+        <StepHeader number="4" title="BATCH SIZE" />
+        <BatchSizePicker
+          selectedSize={batchSize}
+          visible={batchSizeModalVisible}
+          disabled={processing}
+          onSelect={handleSelectBatchSize}
+          onClose={() => setBatchSizeModalVisible(false)}
+          onOpen={() => setBatchSizeModalVisible(true)}
         />
 
         {/* Process Button */}

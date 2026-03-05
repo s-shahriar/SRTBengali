@@ -68,3 +68,9 @@ export interface BatchStats {
   cachedTokens: number;
   success: boolean;
 }
+
+export interface BatchSizeOption {
+  value: number;
+  label: string;
+  description: string;
+}

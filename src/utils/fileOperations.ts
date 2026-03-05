@@ -1,7 +1,12 @@
 import { Platform, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { requestStoragePermissions } from './permissions';
+import {
+  getSavedDirectoryUri,
+  requestDirectoryAccess,
+} from './permissions';
+
+const { StorageAccessFramework } = FileSystem;
 
 /**
  * Reads a file from URI (cross-platform: web + native)
@@ -18,21 +23,17 @@ export async function readFile(uri: string): Promise<string> {
 }
 
 /**
- * Extracts the directory path from a file URI
- */
-function getDirectoryFromUri(uri: string): string {
-  const lastSlash = uri.lastIndexOf('/');
-  return lastSlash >= 0 ? uri.substring(0, lastSlash) : '';
-}
-
-/**
- * Saves a file to the same directory as the source file
- * Falls back to share dialog if direct save fails
+ * Save a file using SAF on Android, share dialog as fallback.
+ *
+ * Flow:
+ * 1. If we have a saved SAF directory → create file there via SAF
+ * 2. If no SAF dir → ask user to pick one via SAF directory picker
+ * 3. If user denies picker → save to app dir + offer share dialog
  */
 export async function saveFile(
   filename: string,
   content: string,
-  sourceUri?: string
+  _sourceUri?: string
 ): Promise<void> {
   if (Platform.OS === 'web') {
     // Trigger a browser download
@@ -48,100 +49,75 @@ export async function saveFile(
     return;
   }
 
-  // Request permissions first
-  const hasPermission = await requestStoragePermissions();
-  if (!hasPermission) {
-    Alert.alert(
-      'Permission Denied',
-      'Storage permission is required to save files. Using share dialog instead.'
-    );
-    // Fall back to share dialog
-    await saveViaShareDialog(filename, content);
-    return;
-  }
-
   try {
-    // Try to save to the source directory
-    if (sourceUri) {
-      const sourceDir = getDirectoryFromUri(sourceUri);
-      if (sourceDir) {
-        const outputUri = `${sourceDir}/${filename}`;
+    // Try SAF-based save
+    let dirUri = await getSavedDirectoryUri();
 
-        try {
-          // Attempt to write to the same directory
-          await FileSystem.writeAsStringAsync(outputUri, content, {
-            encoding: FileSystem.EncodingType.UTF8,
-          });
-
-          Alert.alert(
-            'Success',
-            `File saved successfully:\n${filename}`,
-            [{ text: 'OK' }]
-          );
-          return;
-        } catch (writeError: any) {
-          // If direct write fails (common on Android 10+), use SAF
-          console.log('Direct write failed, trying alternative method:', writeError.message);
-        }
-      }
+    if (!dirUri) {
+      // No saved directory — ask user to grant access
+      dirUri = await requestDirectoryAccess();
     }
 
-    // Fallback: Save to app's document directory and offer share
-    const documentsDir = FileSystem.documentDirectory;
-    if (!documentsDir) {
-      throw new Error('Document directory not available');
+    if (dirUri) {
+      // We have SAF directory access — create file and write
+      const fileUri = await StorageAccessFramework.createFileAsync(
+        dirUri,
+        filename,
+        'text/plain'
+      );
+      await StorageAccessFramework.writeAsStringAsync(fileUri, content, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      Alert.alert('Success', `File saved:\n${filename}`);
+      return;
     }
 
-    const outputUri = `${documentsDir}${filename}`;
-    await FileSystem.writeAsStringAsync(outputUri, content, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-
-    // Show success and ask user if they want to move/share the file
-    Alert.alert(
-      'File Saved',
-      `File saved to app directory. Would you like to move it to the source folder?`,
-      [
-        {
-          text: 'Keep Here',
-          style: 'cancel',
-          onPress: () => {
-            Alert.alert('Saved', `File saved at:\n${documentsDir}${filename}`);
-          },
-        },
-        {
-          text: 'Move to Source',
-          onPress: async () => {
-            await Sharing.shareAsync(outputUri, {
-              mimeType: 'text/plain',
-              dialogTitle: `Save ${filename} to source folder`,
-              UTI: 'public.plain-text',
-            });
-          },
-        },
-      ]
-    );
+    // SAF denied — fall back to app directory + share
+    await saveToAppDirAndShare(filename, content);
   } catch (error: any) {
-    console.error('Save error:', error);
-    Alert.alert(
-      'Save Failed',
-      `Could not save file: ${error.message}. Using share dialog instead.`
-    );
-    await saveViaShareDialog(filename, content);
+    console.error('SAF save error:', error);
+    // If SAF write failed (e.g. stale permission), fall back
+    try {
+      await saveToAppDirAndShare(filename, content);
+    } catch (fallbackError: any) {
+      Alert.alert('Save Failed', fallbackError.message);
+    }
   }
 }
 
 /**
- * Helper function to save file via share dialog
+ * Fallback: save to app's document directory and offer share dialog.
  */
-async function saveViaShareDialog(filename: string, content: string): Promise<void> {
-  const outputUri = (FileSystem.cacheDirectory ?? '') + filename;
+async function saveToAppDirAndShare(
+  filename: string,
+  content: string
+): Promise<void> {
+  const documentsDir = FileSystem.documentDirectory;
+  if (!documentsDir) {
+    throw new Error('Document directory not available');
+  }
+
+  const outputUri = `${documentsDir}${filename}`;
   await FileSystem.writeAsStringAsync(outputUri, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  await Sharing.shareAsync(outputUri, {
-    mimeType: 'text/plain',
-    dialogTitle: `Save ${filename}`,
-    UTI: 'public.plain-text',
-  });
+
+  Alert.alert(
+    'File Saved',
+    `File saved to app storage. Use "Share" to move it to another location.`,
+    [
+      { text: 'OK', style: 'cancel' },
+      {
+        text: 'Share',
+        onPress: async () => {
+          await Sharing.shareAsync(outputUri, {
+            mimeType: 'text/plain',
+            dialogTitle: `Save ${filename}`,
+            UTI: 'public.plain-text',
+          });
+        },
+      },
+    ]
+  );
 }

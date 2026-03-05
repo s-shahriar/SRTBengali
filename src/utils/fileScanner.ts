@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { getSavedDirectoryUri } from './permissions';
+
+const { StorageAccessFramework } = FileSystem;
 
 export interface SRTFileInfo {
   uri: string;
@@ -9,9 +12,90 @@ export interface SRTFileInfo {
 }
 
 /**
- * Recursively scans a directory for SRT files
+ * Extract a human-readable filename from a SAF URI.
+ * SAF URIs are URL-encoded; this decodes them and returns the last path segment.
  */
-async function scanDirectory(
+function getNameFromSafUri(uri: string): string {
+  const decoded = decodeURIComponent(uri);
+  // SAF URIs look like:
+  // content://com.android.externalstorage.documents/tree/primary%3ADownload/document/primary%3ADownload%2Ffile.srt
+  // After decoding: .../primary:Download/file.srt
+  const lastSlash = decoded.lastIndexOf('/');
+  const lastColon = decoded.lastIndexOf(':');
+  const lastSep = Math.max(lastSlash, lastColon);
+  return lastSep >= 0 ? decoded.substring(lastSep + 1) : decoded;
+}
+
+/**
+ * Check if a filename is a subtitle file.
+ */
+function isSubtitleFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.srt') || lower.endsWith('.ass') || lower.endsWith('.vtt');
+}
+
+/**
+ * Recursively scan a SAF directory for subtitle files.
+ *
+ * FileSystem.getInfoAsync() does not reliably report isDirectory for SAF URIs.
+ * Instead we try readDirectoryAsync on each entry: if it succeeds → directory,
+ * if it throws → file.
+ */
+async function scanSafDirectory(
+  directoryUri: string,
+  maxDepth: number = 5,
+  currentDepth: number = 0
+): Promise<SRTFileInfo[]> {
+  if (currentDepth >= maxDepth) return [];
+
+  const files: SRTFileInfo[] = [];
+
+  try {
+    const entries = await StorageAccessFramework.readDirectoryAsync(directoryUri);
+
+    for (const entryUri of entries) {
+      // Try treating it as a directory first
+      let isDir = false;
+      try {
+        await StorageAccessFramework.readDirectoryAsync(entryUri);
+        isDir = true;
+      } catch {
+        // Not a directory
+      }
+
+      if (isDir) {
+        const subFiles = await scanSafDirectory(entryUri, maxDepth, currentDepth + 1);
+        files.push(...subFiles);
+      } else {
+        const name = getNameFromSafUri(entryUri);
+        if (isSubtitleFile(name)) {
+          let size = 0;
+          let modTime = 0;
+          try {
+            const info = await FileSystem.getInfoAsync(entryUri);
+            if (info.exists) {
+              size = info.size || 0;
+              modTime = info.modificationTime || 0;
+            }
+          } catch {
+            // Use defaults
+          }
+          files.push({ uri: entryUri, name, size, modificationTime: modTime });
+        }
+      }
+    }
+  } catch (err) {
+    console.log(`Cannot scan SAF directory: ${directoryUri}`, err);
+  }
+
+  return files;
+}
+
+/**
+ * Recursively scans a regular file:// directory for subtitle files.
+ * Used for scanning the app's own document/cache directories.
+ */
+async function scanLocalDirectory(
   directoryUri: string,
   maxDepth: number = 3,
   currentDepth: number = 0
@@ -24,82 +108,61 @@ async function scanDirectory(
     const items = await FileSystem.readDirectoryAsync(directoryUri);
 
     for (const item of items) {
-      const itemUri = `${directoryUri}/${item}`;
+      const itemUri = `${directoryUri}${directoryUri.endsWith('/') ? '' : '/'}${item}`;
 
       try {
         const info = await FileSystem.getInfoAsync(itemUri);
 
         if (info.exists) {
           if (info.isDirectory) {
-            // Recursively scan subdirectories
-            const subFiles = await scanDirectory(
+            const subFiles = await scanLocalDirectory(
               itemUri,
               maxDepth,
               currentDepth + 1
             );
             files.push(...subFiles);
-          } else {
-            // Check if it's an SRT file
-            const isSRTFile =
-              item.toLowerCase().endsWith('.srt') ||
-              item.toLowerCase().endsWith('.ass') ||
-              item.toLowerCase().endsWith('.vtt');
-
-            if (isSRTFile) {
-              files.push({
-                uri: itemUri,
-                name: item,
-                size: info.size || 0,
-                modificationTime: info.modificationTime || 0,
-              });
-            }
+          } else if (isSubtitleFile(item)) {
+            files.push({
+              uri: itemUri,
+              name: item,
+              size: info.size || 0,
+              modificationTime: info.modificationTime || 0,
+            });
           }
         }
-      } catch (itemError) {
+      } catch {
         // Skip files we can't access
-        console.log(`Cannot access: ${itemUri}`);
       }
     }
-  } catch (dirError) {
+  } catch {
     // Skip directories we can't access
-    console.log(`Cannot scan directory: ${directoryUri}`);
   }
 
   return files;
 }
 
 /**
- * Scans the device for SRT files
- * Returns files from app's document directory and common subtitle locations
+ * Scans for subtitle files from:
+ * 1. The SAF-granted user directory (if granted)
+ * 2. The app's own document directory (always accessible)
  */
 export async function scanForSRTFiles(): Promise<SRTFileInfo[]> {
   const allFiles: SRTFileInfo[] = [];
 
   try {
-    // Always scan app's document directory
+    // 1. Scan app's own document directory (always works)
     const documentDirectory = FileSystem.documentDirectory;
     if (documentDirectory) {
-      const docFiles = await scanDirectory(documentDirectory, 2);
+      const docFiles = await scanLocalDirectory(documentDirectory, 2);
       allFiles.push(...docFiles);
     }
 
-    // On Android, try to scan common directories
+    // 2. On Android, scan the SAF-granted directory
     if (Platform.OS === 'android') {
-      const commonPaths = [
-        FileSystem.cacheDirectory,
-        // Note: On Android 10+, we may not have access to external storage
-        // without proper SAF permissions
-      ];
-
-      for (const path of commonPaths) {
-        if (path) {
-          try {
-            const files = await scanDirectory(path, 2);
-            allFiles.push(...files);
-          } catch (error) {
-            console.log(`Cannot scan ${path}`);
-          }
-        }
+      const safUri = await getSavedDirectoryUri();
+      if (safUri) {
+        const safFiles = await scanSafDirectory(safUri);
+        allFiles.push(...safFiles);
       }
     }
 

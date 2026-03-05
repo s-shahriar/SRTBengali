@@ -5,13 +5,13 @@ import { readFile, saveFile } from '../utils/fileOperations';
 import { detectFormat, parse, buildSubtitle, makeOutputName } from '../utils/subtitleParser';
 import { chunk, sleep, sleepWithCountdown } from '../utils/helpers';
 import { annotateBatch } from '../services/geminiApi';
-import { BATCH_SIZE } from '../constants/config';
 
 interface UseSubtitleProcessorParams {
   apiKey: string;
   model: GeminiModel;
   selectedFile: SelectedFile | null;
   onLog: (message: string) => void;
+  batchSize: number;
 }
 
 function fmtTime(ms: number): string {
@@ -95,6 +95,7 @@ export function useSubtitleProcessor({
   model,
   selectedFile,
   onLog,
+  batchSize,
 }: UseSubtitleProcessorParams) {
   const [processing, setProcessing] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
@@ -130,12 +131,12 @@ export function useSubtitleProcessor({
       const content = await readFile(uri);
 
       const blocks = parse(content, format);
-      const batches = chunk(blocks, BATCH_SIZE);
+      const batches = chunk(blocks, batchSize);
       const delayMs = Math.ceil(60_000 / model.rpm) + 500;
 
       onLog(`Model    : ${model.label}`);
       onLog(`Blocks   : ${blocks.length} subtitle lines`);
-      onLog(`Batches  : ${batches.length} × up to ${BATCH_SIZE} lines`);
+      onLog(`Batches  : ${batches.length} × up to ${batchSize} lines`);
       onLog(`Delay    : ${delayMs}ms between calls (${model.rpm} RPM)\n`);
 
       const allStats: BatchStats[] = [];
@@ -219,6 +220,63 @@ export function useSubtitleProcessor({
         }
 
         allStats.push(stat);
+      }
+
+      // ── Failed Batch Retry Queue ──────────────────────────────
+      const failedIndices = allStats
+        .filter(s => !s.success)
+        .map(s => s.batchIndex);
+
+      if (failedIndices.length > 0) {
+        onLog(`\n── Retry Queue: ${failedIndices.length} failed batch(es) ──`);
+
+        for (const fi of failedIndices) {
+          if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+          const batch = batches[fi];
+          const existingStat = allStats.find(s => s.batchIndex === fi)!;
+
+          onLog(`[Retry] Batch ${fi + 1} (${batch.length} lines)…`);
+          setStatusMsg(`Retrying batch ${fi + 1} / ${batches.length}`);
+
+          // Rate delay before retry
+          const delayStart = Date.now();
+          await sleep(delayMs, signal);
+          existingStat.rateDelayMs += Date.now() - delayStart;
+
+          try {
+            const result = await annotateBatch(key, model.id, batch.map(b => b.text));
+
+            let retryChanged = 0;
+            result.texts.forEach((newText, j) => {
+              if (newText && newText.trim() && newText !== batch[j].text) {
+                batch[j].text = newText;
+                retryChanged++;
+                onLog(`[${batch[j].index}] ${newText.slice(0, 80)}`);
+              }
+            });
+
+            existingStat.apiTimeMs += result.apiTimeMs;
+            existingStat.promptTokens += result.promptTokens;
+            existingStat.responseTokens += result.responseTokens;
+            existingStat.totalTokens += result.totalTokens;
+            existingStat.cachedTokens += result.cachedTokens;
+            existingStat.linesChanged += retryChanged;
+            existingStat.retryCount++;
+            existingStat.success = true;
+
+            onLog(`[Retry] Batch ${fi + 1} succeeded (${retryChanged} lines changed)`);
+          } catch (retryErr: any) {
+            existingStat.retryCount++;
+            onLog(`[Retry] Batch ${fi + 1} failed again: ${retryErr.message} — skipped`);
+          }
+        }
+
+        const stillFailed = allStats.filter(s => !s.success).length;
+        if (stillFailed > 0) {
+          onLog(`\n${stillFailed} batch(es) could not be recovered — original text preserved.`);
+        } else {
+          onLog(`\nAll failed batches recovered successfully!`);
+        }
       }
 
       const totalElapsedMs = Date.now() - jobStartTime;

@@ -1,6 +1,31 @@
-import { GeminiModel } from '../types';
+import { GeminiModel, BatchSizeOption } from '../types';
 
 export const BATCH_SIZE = 200;
+
+export const BATCH_SIZE_STORAGE_KEY = 'batch_size';
+
+export const BATCH_SIZE_OPTIONS: BatchSizeOption[] = [
+  {
+    value: 50,
+    label: '50 lines',
+    description: 'Safest — fewest failures, but many API calls and longer total time',
+  },
+  {
+    value: 100,
+    label: '100 lines',
+    description: 'Balanced — moderate API calls, low failure risk',
+  },
+  {
+    value: 150,
+    label: '150 lines',
+    description: 'Faster — fewer API calls, slightly higher mismatch chance',
+  },
+  {
+    value: 200,
+    label: '200 lines',
+    description: 'Fastest — fewest API calls, but higher mismatch risk on large files',
+  },
+];
 
 export const MODELS: GeminiModel[] = [
   {
