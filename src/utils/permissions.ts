@@ -60,7 +60,8 @@ export async function clearSavedDirectoryUri(): Promise<void> {
 }
 
 /**
- * Check if we have a saved directory access grant.
+ * Check if we have a saved directory URI.
+ * Actual validation happens during scanning (avoids redundant readDir call).
  */
 export async function hasDirectoryAccess(): Promise<boolean> {
   if (Platform.OS !== 'android') {

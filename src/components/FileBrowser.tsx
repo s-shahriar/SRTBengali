@@ -283,7 +283,7 @@ export function FileBrowser() {
             <View style={styles.fileInfo}>
               <Text style={styles.fileName} numberOfLines={2}>{file.name}</Text>
               <Text style={styles.fileDetails}>
-                {formatFileSize(file.size)} · {formatDate(file.modificationTime)}
+                {file.size > 0 ? formatFileSize(file.size) : ''}{file.size > 0 && file.modificationTime > 0 ? ' · ' : ''}{file.modificationTime > 0 ? formatDate(file.modificationTime) : ''}
               </Text>
             </View>
 
