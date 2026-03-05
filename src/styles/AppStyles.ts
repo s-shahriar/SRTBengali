@@ -124,4 +124,16 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
+  cancelBtn: {
+    backgroundColor: colors.error,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center' as const,
+    marginTop: 10,
+  },
+  cancelBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

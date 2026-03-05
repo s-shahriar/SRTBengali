@@ -72,7 +72,7 @@ export default function App() {
   };
 
   // Subtitle processor
-  const { processing, statusMsg, processSubtitle } = useSubtitleProcessor({
+  const { processing, statusMsg, processSubtitle, cancelProcessing } = useSubtitleProcessor({
     apiKey,
     model,
     selectedFile,
@@ -200,6 +200,13 @@ export default function App() {
             </Text>
           )}
         </TouchableOpacity>
+
+        {/* Cancel Button */}
+        {processing && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={cancelProcessing}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Log */}
         <ProcessingLog log={log} />
