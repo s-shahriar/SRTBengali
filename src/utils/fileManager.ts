@@ -2,21 +2,39 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 const { StorageAccessFramework } = FileSystem;
 
+
+function getMimeTypeForSubtitle(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'srt') return 'application/x-subrip';
+  if (ext === 'ass' || ext === 'ssa') return 'text/x-ssa';
+  if (ext === 'vtt') return 'text/vtt';
+  return 'text/plain';
+}
+
 function isSafUri(uri: string): boolean {
   return uri.startsWith('content://');
 }
 
 /**
- * Extract the parent tree URI from a SAF document URI.
- * SAF doc URIs look like:
- *   content://com.android.externalstorage.documents/tree/primary%3ADownload/document/primary%3ADownload%2Ffile.srt
- * The tree portion (before /document/) is what we need for createFileAsync.
+ * Extract parent directory URI from a SAF document URI.
+ * Keeps file creation in the same folder as the original file.
  */
-function getParentTreeUri(docUri: string): string | null {
-  const treeIdx = docUri.indexOf('/tree/');
+function getParentDirectoryUri(docUri: string): string | null {
   const docIdx = docUri.indexOf('/document/');
-  if (treeIdx < 0 || docIdx < 0) return null;
-  return docUri.substring(0, docIdx);
+  if (docIdx < 0) return null;
+
+  const treeRootUri = docUri.substring(0, docIdx);
+  const docIdEncoded = docUri.substring(docIdx + '/document/'.length);
+  const docId = decodeURIComponent(docIdEncoded);
+  const lastSlash = docId.lastIndexOf('/');
+
+  // File is directly under selected root folder
+  if (lastSlash < 0) {
+    return treeRootUri;
+  }
+
+  const parentDocId = docId.substring(0, lastSlash);
+  return `${treeRootUri}/document/${encodeURIComponent(parentDocId)}`;
 }
 
 /**
@@ -28,7 +46,7 @@ export async function renameFile(
 ): Promise<string> {
   try {
     if (isSafUri(oldUri)) {
-      const parentUri = getParentTreeUri(oldUri);
+      const parentUri = getParentDirectoryUri(oldUri);
       if (!parentUri) {
         throw new Error('Cannot determine parent directory from SAF URI');
       }
@@ -42,7 +60,7 @@ export async function renameFile(
       const newUri = await StorageAccessFramework.createFileAsync(
         parentUri,
         newName,
-        'text/plain'
+        getMimeTypeForSubtitle(newName)
       );
 
       // Write content to new file

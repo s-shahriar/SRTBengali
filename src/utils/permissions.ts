@@ -67,6 +67,19 @@ export async function hasDirectoryAccess(): Promise<boolean> {
   if (Platform.OS !== 'android') {
     return true;
   }
+
   const uri = await getSavedDirectoryUri();
-  return uri !== null;
+  if (!uri) {
+    return false;
+  }
+
+  try {
+    // Validate persisted SAF grant. Android can revoke grants after reinstall,
+    // restore, or storage provider changes.
+    await StorageAccessFramework.readDirectoryAsync(uri);
+    return true;
+  } catch {
+    await clearSavedDirectoryUri();
+    return false;
+  }
 }
