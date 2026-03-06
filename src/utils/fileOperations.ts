@@ -20,6 +20,12 @@ function isSafUri(uri: string): boolean {
   return uri.startsWith('content://');
 }
 
+function isInAppCache(uri: string): boolean {
+  const cacheDir = FileSystem.cacheDirectory;
+  if (!cacheDir) return false;
+  return uri.startsWith(cacheDir);
+}
+
 /**
  * Extract parent directory URI from a SAF document URI.
  * Keeps file creation in the same folder as the source file.
@@ -75,7 +81,7 @@ async function saveToSafDirectory(
  *
  * Flow:
  * 1. If source is SAF URI -> save in source file's parent folder
- * 2. Else if source is file:// URI -> save in same local folder
+ * 2. Else if source is file:// URI outside app cache -> save in same local folder
  * 3. Else use saved SAF directory / prompt for one
  * 4. If everything fails -> save in app dir + share
  */
@@ -108,7 +114,11 @@ export async function saveFile(
       }
     }
 
-    if (sourceUri && sourceUri.startsWith('file://')) {
+    if (
+      sourceUri &&
+      sourceUri.startsWith('file://') &&
+      !isInAppCache(sourceUri)
+    ) {
       const lastSlash = sourceUri.lastIndexOf('/');
       if (lastSlash > 0) {
         const directoryUri = sourceUri.substring(0, lastSlash + 1);
