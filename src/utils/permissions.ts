@@ -52,34 +52,3 @@ export async function getSavedDirectoryUri(): Promise<string | null> {
   }
 }
 
-/**
- * Clear the saved SAF directory URI (e.g. to switch folders).
- */
-export async function clearSavedDirectoryUri(): Promise<void> {
-  await AsyncStorage.removeItem(SAF_DIR_URI_KEY);
-}
-
-/**
- * Check if we have a saved directory URI.
- * Actual validation happens during scanning (avoids redundant readDir call).
- */
-export async function hasDirectoryAccess(): Promise<boolean> {
-  if (Platform.OS !== 'android') {
-    return true;
-  }
-
-  const uri = await getSavedDirectoryUri();
-  if (!uri) {
-    return false;
-  }
-
-  try {
-    // Validate persisted SAF grant. Android can revoke grants after reinstall,
-    // restore, or storage provider changes.
-    await StorageAccessFramework.readDirectoryAsync(uri);
-    return true;
-  } catch {
-    await clearSavedDirectoryUri();
-    return false;
-  }
-}

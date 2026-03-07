@@ -30,64 +30,24 @@ function pct(part: number, total: number): string {
 function printReport(
   stats: BatchStats[],
   totalElapsedMs: number,
-  fileName: string,
-  modelLabel: string,
+  _fileName: string,
+  _modelLabel: string,
   totalLines: number,
   onLog: (msg: string) => void,
 ) {
   const log = onLog;
 
-  log('');
-  log('═══════════════════════════════════════════');
-  log('  TRANSLATION PERFORMANCE REPORT');
-  log('═══════════════════════════════════════════');
-  log(`  File       : ${fileName}`);
-  log(`  Model      : ${modelLabel}`);
-  log(`  Total lines: ${totalLines}`);
-  log('');
-  log('  ─── PER-BATCH BREAKDOWN ───────────────');
-  log('  Batch │ Lines │ API Time │ RPM Wait │ 429 Wait │ Retries │ Changed │ Prompt Tk │ Resp Tk │ Cached Tk');
-  log('  ──────┼───────┼──────────┼──────────┼──────────┼─────────┼─────────┼───────────┼─────────┼──────────');
-
-  for (const s of stats) {
-    const idx = String(s.batchIndex + 1).padStart(4);
-    const lines = String(s.lineCount).padStart(5);
-    const api = fmtTime(s.apiTimeMs).padStart(8);
-    const rateDelay = fmtTime(s.rateDelayMs).padStart(8);
-    const rlWait = fmtTime(s.rateLimitWaitMs).padStart(8);
-    const retries = String(s.retryCount).padStart(7);
-    const changed = String(s.linesChanged).padStart(7);
-    const pTk = String(s.promptTokens).padStart(9);
-    const rTk = String(s.responseTokens).padStart(7);
-    const cTk = String(s.cachedTokens).padStart(9);
-    log(`  ${idx}  │${lines} │${api} │${rateDelay} │${rlWait} │${retries} │${changed} │${pTk} │${rTk} │${cTk}`);
-  }
-
-  const totApiMs = stats.reduce((a, s) => a + s.apiTimeMs, 0);
-  const totRateDelay = stats.reduce((a, s) => a + s.rateDelayMs, 0);
-  const totRlWait = stats.reduce((a, s) => a + s.rateLimitWaitMs, 0);
   const totRetries = stats.reduce((a, s) => a + s.retryCount, 0);
   const totChanged = stats.reduce((a, s) => a + s.linesChanged, 0);
-  const totPromptTk = stats.reduce((a, s) => a + s.promptTokens, 0);
-  const totRespTk = stats.reduce((a, s) => a + s.responseTokens, 0);
-  const totAllTk = stats.reduce((a, s) => a + s.totalTokens, 0);
-  const totCachedTk = stats.reduce((a, s) => a + s.cachedTokens, 0);
+  const failedBatches = stats.filter(s => !s.success).length;
 
   log('');
-  log('  ─── CONSOLIDATED SUMMARY ──────────────');
-  log(`  Total wall time  : ${fmtTime(totalElapsedMs)}`);
-  log(`  ├─ API calls     : ${fmtTime(totApiMs)}  (${pct(totApiMs, totalElapsedMs)})`);
-  log(`  ├─ RPM delays    : ${fmtTime(totRateDelay)}  (${pct(totRateDelay, totalElapsedMs)})`);
-  log(`  └─ 429 wait      : ${fmtTime(totRlWait)}  (${pct(totRlWait, totalElapsedMs)})`);
-  log('');
-  log(`  Total tokens     : ${totAllTk.toLocaleString()}`);
-  log(`  ├─ Prompt tokens : ${totPromptTk.toLocaleString()}${totCachedTk > 0 ? `  (cached: ${totCachedTk.toLocaleString()})` : ''}`);
-  log(`  └─ Response tokens: ${totRespTk.toLocaleString()}`);
-  log('');
-  log(`  Lines changed    : ${totChanged} / ${totalLines}  (${pct(totChanged, totalLines)})`);
-  log(`  Retries          : ${totRetries}`);
-  log(`  Avg API time     : ${fmtTime(Math.round(totApiMs / stats.length))} / batch`);
-  log('═══════════════════════════════════════════');
+  log('─── SUMMARY ───────────────────');
+  log(`  Time taken    : ${fmtTime(totalElapsedMs)}`);
+  log(`  Lines changed : ${totChanged} / ${totalLines}  (${pct(totChanged, totalLines)})`);
+  log(`  Retries       : ${totRetries}`);
+  log(`  Failed batches: ${failedBatches === 0 ? 'None' : failedBatches}`);
+  log('───────────────────────────────');
 }
 
 export function useSubtitleProcessor({
@@ -134,10 +94,7 @@ export function useSubtitleProcessor({
       const batches = chunk(blocks, batchSize);
       const delayMs = Math.ceil(60_000 / model.rpm) + 500;
 
-      onLog(`Model    : ${model.label}`);
-      onLog(`Blocks   : ${blocks.length} subtitle lines`);
-      onLog(`Batches  : ${batches.length} × up to ${batchSize} lines`);
-      onLog(`Delay    : ${delayMs}ms between calls (${model.rpm} RPM)\n`);
+      onLog(`Processing ${blocks.length} lines in ${batches.length} batch(es)…\n`);
 
       const allStats: BatchStats[] = [];
       const jobStartTime = Date.now();
@@ -181,10 +138,6 @@ export function useSubtitleProcessor({
           } catch (err: any) {
             if (err instanceof RateLimitError && attempt < maxRetries) {
               stat.retryCount++;
-              const waitSec = Math.ceil(err.retryAfterMs / 1000);
-              onLog(
-                `[Batch ${i + 1}] Rate limited — API says wait ${waitSec}s (retry ${attempt + 1}/${maxRetries})`
-              );
               const rlStart = Date.now();
               await sleepWithCountdown(err.retryAfterMs, remaining => {
                 setStatusMsg(`Rate limited — retrying in ${remaining}s…`);
@@ -192,12 +145,9 @@ export function useSubtitleProcessor({
               stat.rateLimitWaitMs += Date.now() - rlStart;
             } else if (err instanceof CountMismatchError && attempt < maxRetries) {
               stat.retryCount++;
-              onLog(
-                `[Batch ${i + 1}] Count mismatch (got ${err.received}, expected ${err.expected}) — retry ${attempt + 1}/${maxRetries}`
-              );
               setStatusMsg(`Count mismatch — retrying batch ${i + 1}…`);
             } else {
-              onLog(`[Batch ${i + 1}] Error: ${err.message} — skipped`);
+              onLog(`Batch ${i + 1} failed: ${err.message}`);
               break; // keep originals
             }
           }
@@ -208,7 +158,6 @@ export function useSubtitleProcessor({
           if (newText && newText.trim() && newText !== batch[j].text) {
             batch[j].text = newText;
             stat.linesChanged++;
-            onLog(`[${batch[j].index}] ${newText.slice(0, 80)}`);
           }
         });
 
@@ -228,14 +177,13 @@ export function useSubtitleProcessor({
         .map(s => s.batchIndex);
 
       if (failedIndices.length > 0) {
-        onLog(`\n── Retry Queue: ${failedIndices.length} failed batch(es) ──`);
+        onLog(`\nRetrying ${failedIndices.length} failed batch(es)…`);
 
         for (const fi of failedIndices) {
           if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
           const batch = batches[fi];
           const existingStat = allStats.find(s => s.batchIndex === fi)!;
 
-          onLog(`[Retry] Batch ${fi + 1} (${batch.length} lines)…`);
           setStatusMsg(`Retrying batch ${fi + 1} / ${batches.length}`);
 
           // Rate delay before retry
@@ -251,7 +199,6 @@ export function useSubtitleProcessor({
               if (newText && newText.trim() && newText !== batch[j].text) {
                 batch[j].text = newText;
                 retryChanged++;
-                onLog(`[${batch[j].index}] ${newText.slice(0, 80)}`);
               }
             });
 
@@ -263,19 +210,15 @@ export function useSubtitleProcessor({
             existingStat.linesChanged += retryChanged;
             existingStat.retryCount++;
             existingStat.success = true;
-
-            onLog(`[Retry] Batch ${fi + 1} succeeded (${retryChanged} lines changed)`);
           } catch (retryErr: any) {
             existingStat.retryCount++;
-            onLog(`[Retry] Batch ${fi + 1} failed again: ${retryErr.message} — skipped`);
+            onLog(`Batch ${fi + 1} retry failed: ${retryErr.message}`);
           }
         }
 
         const stillFailed = allStats.filter(s => !s.success).length;
         if (stillFailed > 0) {
-          onLog(`\n${stillFailed} batch(es) could not be recovered — original text preserved.`);
-        } else {
-          onLog(`\nAll failed batches recovered successfully!`);
+          onLog(`${stillFailed} batch(es) still failed — original text kept.`);
         }
       }
 
@@ -286,7 +229,7 @@ export function useSubtitleProcessor({
       const outputContent = buildSubtitle(blocks, format, content);
       const outputFilename = makeOutputName(name);
 
-      onLog(`\nDone! Saving ${outputFilename}…`);
+      onLog(`Saving ${outputFilename}…`);
 
       // Pass the source URI so the file can be saved in the same directory
       await saveFile(outputFilename, outputContent, uri);
