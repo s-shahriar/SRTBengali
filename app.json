@@ -18,10 +18,28 @@
         "monochromeImage": "./assets/android-icon-monochrome.png",
         "backgroundColor": "#0f0f23"
       },
-      "permissions": []
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "plugins": [
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow SRT Bengali to access files on your device",
+          "savePhotosPermission": "Allow SRT Bengali to save translated subtitle files to your device",
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ],
     "extra": {
       "eas": {

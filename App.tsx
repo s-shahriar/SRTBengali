@@ -36,6 +36,7 @@ import { BatchSizePicker } from './src/components/BatchSizePicker';
 
 // Utils
 import { detectFormat, makeOutputName } from './src/utils/subtitleParser';
+import { permissionHandler } from './src/utils/permissions';
 
 const MODEL_ID_STORAGE_KEY = 'model_id';
 
@@ -57,8 +58,10 @@ export default function App() {
   // Logging
   const [log, setLog] = useState('');
 
-  // Restore saved preferences
+  // Request storage permissions on first boot & restore saved preferences
   useEffect(() => {
+    permissionHandler.requestStoragePermission();
+
     AsyncStorage.getItem(MODEL_ID_STORAGE_KEY).then(id => {
       if (id) {
         const savedModel = MODELS.find(m => m.id === id);

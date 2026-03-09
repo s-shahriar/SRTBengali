@@ -30,7 +30,36 @@ Open `http://localhost:8081` (or the port shown in terminal).
 
 ---
 
-## Build APK (Android)
+## Running the App
+
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start Expo dev server |
+| `npm run dev:android` | Run on connected Android device with hot reload |
+| `npm run web` | Start web version |
+
+### Building APK (Local)
+
+| Command | Description |
+|---------|-------------|
+| `npm run build:android` | Build APK for **arm64 only** (faster build, smaller APK) |
+| `npm run build:android:all` | Build APK for **all architectures** (universal) |
+| `npm run build:android:x86` | Build APK for **x86_64 only** (emulator) |
+
+### Building APK (Cloud)
+
+| Command | Description |
+|---------|-------------|
+| `npm run build:android:cloud` | Build APK on EAS servers (no local resources needed) |
+
+### Build Optimizations
+
+The build is configured with the following optimizations in [eas.json](eas.json):
+- **arm64-v8a only** (default profile) — smaller APK, faster build
+- **Parallel Gradle execution** — uses multiple workers to speed up builds
+- **Max 4 Gradle workers** — prevents system from hanging during builds
 
 ### Prerequisites — install once
 
@@ -38,16 +67,6 @@ Open `http://localhost:8081` (or the port shown in terminal).
 npm install -g eas-cli
 eas login          # create free account at expo.dev if needed
 ```
-
-### Build
-
-```bash
-eas build --platform android --profile preview
-```
-
-- First build: ~10–15 min on Expo's cloud servers
-- Download link appears in terminal when done
-- Also visible at **expo.dev → your project → Builds**
 
 ### Install on phone
 
@@ -69,53 +88,12 @@ eas build --platform android --profile preview
 
 ---
 
-## Build Locally (faster iteration)
-
-Instead of cloud builds, you can build on your local machine:
-
-### Prerequisites for local builds
-
-**Option 1: Using Docker (recommended)**
-```bash
-# Install Docker Desktop from docker.com
-# EAS will automatically detect and use it
-```
-
-**Option 2: Android Studio**
-- Install [Android Studio](https://developer.android.com/studio)
-- Install Android SDK, NDK, and build tools via SDK Manager
-- Set `ANDROID_HOME` environment variable
-
-### Local build commands
-
-```bash
-# Build APK locally (no EAS cloud usage)
-eas build --platform android --profile preview --local
-
-# Output: .apk file in current directory (~5-10 min first time)
-```
-
-**Benefits of local builds:**
-- Faster iteration (no upload/queue time)
-- Free (no EAS build credits used)
-- Works offline after initial setup
-
-**Drawbacks:**
-- Requires local setup (Docker or Android Studio)
-- Uses your machine's resources
-- Larger initial download (~2-3 GB for Android build environment)
-
----
-
 ## EAS Build reference
 
 | Command | What it does |
 |---|---|
 | `eas login` | Log in to your Expo account |
 | `eas whoami` | Check logged-in account |
-| `eas build --platform android --profile preview` | Build APK on cloud (free, no signing) |
-| `eas build --platform android --profile preview --local` | Build APK locally |
-| `eas build --platform android --profile production` | Build signed AAB for Play Store |
 | `eas build:list` | See all past builds |
 | `eas build:cancel` | Cancel a running build |
 
